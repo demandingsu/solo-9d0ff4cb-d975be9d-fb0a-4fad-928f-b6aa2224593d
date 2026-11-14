@@ -6,9 +6,17 @@ services:
     environment:
       DB_PATH: /data/db/measurements.db
       INCOMING_DIR: /data/incoming
+      VOUCHER_DIR: /data/vouchers
+      # Demo hooks (see README "演示 3/4"):
+      #  - this voucher fails on its first generation, then succeeds on retry
+      #  - this voucher "crashes" the process after the CSV is fully written
+      #    but before the status is saved; restart recovery adopts the file
+      VOUCHER_FAIL_REQUEST_IDS: "demo-fail"
+      VOUCHER_CRASH_AFTER_RENAME: "demo-crash"
     volumes:
       - measurements-db:/data/db      # persistent measurement database
       - incoming:/data/incoming       # shared collection directory
+      - vouchers:/data/vouchers       # generated handover CSVs
     restart: unless-stopped
 
   simulator:
@@ -40,3 +48,4 @@ services:
 volumes:
   measurements-db:
   incoming:
+  vouchers:

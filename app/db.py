@@ -53,6 +53,42 @@ CREATE TABLE IF NOT EXISTS rejected_lines (
 
 CREATE INDEX IF NOT EXISTS idx_measurements_sample    ON measurements(sample_id);
 CREATE INDEX IF NOT EXISTS idx_measurements_weighed_at ON measurements(weighed_at);
+
+-- Handover vouchers. A voucher is created by POST /vouchers; at acceptance
+-- time (the first request for a request_id) the matching measurement rows
+-- are frozen into voucher_records, so later collection ("补采") can never
+-- alter an already delivered voucher.
+CREATE TABLE IF NOT EXISTS vouchers (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id      TEXT    NOT NULL UNIQUE,          -- idempotency key supplied by the client
+    sample_id       TEXT    NOT NULL,                 -- frozen request parameters
+    since           TEXT    NOT NULL,
+    until           TEXT    NOT NULL,
+    status          TEXT    NOT NULL,                 -- PENDING | GENERATING | COMPLETED | FAILED
+    file_path       TEXT,                             -- final CSV path (only when COMPLETED)
+    failure_reason  TEXT,                             -- last failure detail (only when FAILED)
+    record_count    INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT    NOT NULL,
+    updated_at      TEXT    NOT NULL
+);
+
+-- Immutable snapshot of the measurements a voucher was accepted with.
+-- source_path/generation/line_no are frozen values: even if the source
+-- file is later renamed or truncated, the voucher keeps the original.
+CREATE TABLE IF NOT EXISTS voucher_records (
+    voucher_id      INTEGER NOT NULL REFERENCES vouchers(id),
+    position        INTEGER NOT NULL,                 -- 1-based row order inside the CSV
+    measurement_id  INTEGER NOT NULL,
+    sample_id       TEXT    NOT NULL,                 -- original column 1
+    weighed_at      TEXT    NOT NULL,                 -- original column 2
+    grams           TEXT    NOT NULL,                 -- original column 3 (kept verbatim)
+    source_path     TEXT    NOT NULL,
+    generation      INTEGER NOT NULL,
+    line_no         INTEGER NOT NULL,
+    PRIMARY KEY (voucher_id, position)
+);
+
+CREATE INDEX IF NOT EXISTS idx_voucher_records_mid ON voucher_records(measurement_id);
 """
 
 
